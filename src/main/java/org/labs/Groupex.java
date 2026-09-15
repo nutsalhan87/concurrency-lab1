@@ -12,7 +12,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 
 public class Groupex {
-    private static final int BLOCK_SIZE = Long.BYTES;
+    private static final int BLOCK_SIZE = Integer.SIZE;
     private static final int SPIN_LIMIT = 5;
     private static final long SYS_FUTEX = 202; // amd64
     private static final int FUTEX_WAIT_BITSET = 9;
@@ -48,7 +48,7 @@ public class Groupex {
         if (size <= 0) {
             throw new IllegalArgumentException("Size of the Groupex should be grater than 0");
         }
-        this.blocksLength = ((size - 1) / Long.BYTES) + 1;
+        this.blocksLength = ((size - 1) / BLOCK_SIZE) + 1;
         var memoryLayout = MemoryLayout.sequenceLayout(this.blocksLength, ValueLayout.JAVA_INT);
         this.blocks = shared.allocate(memoryLayout);
         this.alvh = memoryLayout.varHandle(MemoryLayout.PathElement.sequenceElement());
@@ -60,7 +60,7 @@ public class Groupex {
         int mask = getMask(index);
         int prevBlock = (Integer) this.alvh.getAndBitwiseOrAcquire(this.blocks, 0L, blockIndex, mask);
         if ((prevBlock | mask) == prevBlock) {
-            this.lockSlow(index, mask);
+            this.lockSlow(blockIndex, mask);
         }
     }
 
@@ -132,8 +132,8 @@ public class Groupex {
     }
 
     private void validateIndex(int index) throws IndexOutOfBoundsException {
-        if (index >= blocksLength * BLOCK_SIZE) {
-            throw new IndexOutOfBoundsException(String.format("Index out of range: must be in [0; %i] but it is %i", blocksLength * BLOCK_SIZE - 1, index));
+        if (index >= this.blocksLength * BLOCK_SIZE || index < 0) {
+            throw new IndexOutOfBoundsException(String.format("Index out of range: must be in [0; %d] but it is %d", blocksLength * BLOCK_SIZE - 1, index));
         }
     }
 }
