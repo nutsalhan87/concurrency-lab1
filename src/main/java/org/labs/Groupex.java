@@ -6,7 +6,7 @@ import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.SymbolLookup;
+import java.lang.foreign.StructLayout;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
@@ -18,11 +18,22 @@ public class Groupex {
     private static final int FUTEX_WAIT_BITSET = 9;
     private static final int FUTEX_WAKE_BITSET = 10;
     private static final int FUTEX_PRIVATE_FLAG = 128;
-
+    private static final int EAGAIN = 11;
+    private final static int EACCES = 13;
+    private final static int EFAULT = 14;
+    private final static int EINVAL = 22;
+    private final static int ENOSYS = 38; 
+    
     private final Linker linker = Linker.nativeLinker();
-    private final SymbolLookup stdlib = linker.defaultLookup();
+
+    private final StructLayout captureLayout = Linker.Option.captureStateLayout();
+    private final VarHandle errnoHandle =
+        captureLayout.varHandle(MemoryLayout.PathElement.groupElement("errno"));
+    private final ThreadLocal<MemorySegment> captureTL =
+        ThreadLocal.withInitial(() -> Arena.ofAuto().allocate(captureLayout));
+
     private final MethodHandle syscall = linker.downcallHandle(
-        stdlib.findOrThrow("syscall"), 
+        linker.defaultLookup().findOrThrow("syscall"), 
         FunctionDescriptor.of(
             ValueLayout.JAVA_LONG,   // Return type: long
             ValueLayout.JAVA_LONG,   // SYS_FUTEX
@@ -32,7 +43,9 @@ public class Groupex {
             ValueLayout.JAVA_LONG,   // const struct timespec *timeout, or: uint32_t val2
             ValueLayout.JAVA_LONG,   // uint32_t *uaddr2 
             ValueLayout.JAVA_INT     // uint32_t val3
-        )
+        ),
+        Linker.Option.captureCallState("errno"),
+        Linker.Option.firstVariadicArg(1)
     );
 
     private final Arena shared = Arena.ofShared();
@@ -79,7 +92,9 @@ public class Groupex {
         int mask = getMask(index);
         this.alvh.getAndBitwiseAndRelease(this.blocks, 0L, blockIndex, ~mask);
         try {
+            MemorySegment capture = captureTL.get();
             long result = (long) this.syscall.invokeExact(
+                capture,
                 SYS_FUTEX,
                 this.blocks.asSlice(ValueLayout.JAVA_INT.scale(0, blockIndex)).address(),
                 FUTEX_WAKE_BITSET | FUTEX_PRIVATE_FLAG,
@@ -88,8 +103,9 @@ public class Groupex {
                 0L,
                 mask
             );
-            if (result == -1) {
-                throw new RuntimeException("Futex error");    
+            int errno = (int) errnoHandle.get(capture, 0L);
+            if (result == -1 && errno != EAGAIN) {
+                throw new FutexException(errno);
             }
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -113,7 +129,9 @@ public class Groupex {
                 return;
             }
             try {
+                MemorySegment capture = captureTL.get();
                 long result = (long) this.syscall.invokeExact(
+                    capture,
                     SYS_FUTEX,
                     this.blocks.asSlice(ValueLayout.JAVA_INT.scale(0, blockIndex)).address(),
                     FUTEX_WAIT_BITSET | FUTEX_PRIVATE_FLAG,
@@ -122,8 +140,9 @@ public class Groupex {
                     0L,
                     mask
                 );
-                if (result == -1) {
-                    throw new RuntimeException("Futex error");    
+                int errno = (int) errnoHandle.get(capture, 0L);
+                if (result == -1 && errno != EAGAIN) {
+                    throw new FutexException(errno);
                 }
             } catch (Throwable e) {
                 throw new RuntimeException(e);
@@ -134,6 +153,30 @@ public class Groupex {
     private void validateIndex(int index) throws IndexOutOfBoundsException {
         if (index >= this.blocksLength * BLOCK_SIZE || index < 0) {
             throw new IndexOutOfBoundsException(String.format("Index out of range: must be in [0; %d] but it is %d", blocksLength * BLOCK_SIZE - 1, index));
+        }
+    }
+
+    public static class FutexException extends RuntimeException {
+        public FutexException(int errno) {
+            String errorMsg;
+            switch (errno) {
+                case EACCES:
+                    errorMsg = "No read access to the memory of a futex word";
+                    break;
+                case EFAULT:
+                    errorMsg = "uaddr did not point to a valid user-space address";
+                    break;
+                case EINVAL:
+                    errorMsg = "uaddr does not point to a valid object—that is, "
+                        + "the address is not four-byte-aligned";
+                    break;
+                case ENOSYS:
+                    errorMsg = "Invalid operation specified in op";
+                    break;
+                default:
+                    errorMsg = String.format("Unknown futex error: errno=%d", errno);
+            };
+            super(String.format("Futex error: %s", errorMsg));
         }
     }
 }
