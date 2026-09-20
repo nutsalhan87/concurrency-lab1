@@ -17,7 +17,7 @@ public class Restaurant {
     private final CountDownLatch startDinnerSignal = new CountDownLatch(1);
     private final Semaphore outOfFoodSignal = new Semaphore(0);
     private final ExecutorService workingGarcons = Executors.newVirtualThreadPerTaskExecutor();
-    private final ExecutorService eatingPhilosophers = Executors.newThreadPerTaskExecutor(Thread.ofPlatform().factory());
+    private final ExecutorService eatingPhilosophers = Executors.newVirtualThreadPerTaskExecutor();
 
     public Restaurant(int philosophers, long food, int garcons) throws IllegalArgumentException {
         if (philosophers <= 0) {
