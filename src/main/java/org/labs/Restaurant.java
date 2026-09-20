@@ -7,6 +7,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -29,7 +30,10 @@ public class Restaurant {
             throw new IllegalArgumentException("There should be more than 0 garcons");
         }
 
-        var forks = new Groupex(philosophers);
+        var forks = Stream
+            .generate(() -> new ReentrantLock())
+            .limit(philosophers)
+            .toList();
         var orderBus = new LinkedBlockingQueue<Semaphore>(philosophers);
         var foodPool = new AtomicLong(food);
         this.garcons = Stream

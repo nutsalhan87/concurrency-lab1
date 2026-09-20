@@ -7,9 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
+
 import org.junit.jupiter.api.Test;
 
 class PhilosopherTest {
@@ -17,7 +20,7 @@ class PhilosopherTest {
     void waitsForDinnerToStart() throws InterruptedException {
         var orders = new LinkedBlockingQueue<java.util.concurrent.Semaphore>();
         var startDinner = new CountDownLatch(1);
-        var philosopher = new Philosopher(0, 2, new Groupex(2), orders, startDinner);
+        var philosopher = new Philosopher(0, 2, List.of(new ReentrantLock(), new ReentrantLock()), orders, startDinner);
 
         philosopher.start();
         try {
@@ -35,7 +38,7 @@ class PhilosopherTest {
     void eatsAfterOrderIsServed() throws InterruptedException {
         var orders = new LinkedBlockingQueue<java.util.concurrent.Semaphore>();
         var startDinner = new CountDownLatch(1);
-        var philosopher = new Philosopher(0, 2, new Groupex(2), orders, startDinner);
+        var philosopher = new Philosopher(0, 2, List.of(new ReentrantLock(), new ReentrantLock()), orders, startDinner);
 
         philosopher.start();
         startDinner.countDown();

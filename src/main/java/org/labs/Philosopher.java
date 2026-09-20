@@ -1,19 +1,21 @@
 package org.labs;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.Lock;
 
 public class Philosopher extends Thread {
     private final Semaphore foodServedNotifier = new Semaphore(0, false);
     private final int[] forkIndexes;
-    private final Groupex forks;
+    private final List<? extends Lock> forks;
     private final BlockingQueue<Semaphore> orderBus;
     private final CountDownLatch startDinnerSignal;
     private long eaten = 0;
     
-    public Philosopher(int idx, int philosophers, Groupex forks, BlockingQueue<Semaphore> orderBus, CountDownLatch startDinnerSignal) {
+    public Philosopher(int idx, int philosophers, List<? extends Lock> forks, BlockingQueue<Semaphore> orderBus, CountDownLatch startDinnerSignal) {
         this.forkIndexes = new int[]{ idx, (idx + 1) % philosophers };
         Arrays.sort(this.forkIndexes);
         this.forks = forks;
@@ -32,11 +34,11 @@ public class Philosopher extends Thread {
             while (true) {
                 orderBus.put(foodServedNotifier);
                 foodServedNotifier.acquire();
-                forks.lock(forkIndexes[0]);
-                forks.lock(forkIndexes[1]);
+                forks.get(forkIndexes[0]).lock();
+                forks.get(forkIndexes[1]).lock();
                 eaten++;
-                forks.unlock(forkIndexes[0]);
-                forks.unlock(forkIndexes[1]);
+                forks.get(forkIndexes[0]).unlock();
+                forks.get(forkIndexes[1]).unlock();
             }
         } catch (InterruptedException e) {
             return;
