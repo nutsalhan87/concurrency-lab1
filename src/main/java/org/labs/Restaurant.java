@@ -2,7 +2,10 @@ package org.labs;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -11,6 +14,9 @@ public class Restaurant {
     private final List<Garcon> garcons;
     private final List<Philosopher> philosophers;
     private final CountDownLatch startDinnerSignal = new CountDownLatch(1);
+    private final Semaphore outOfFoodSignal = new Semaphore(0);
+    private final ExecutorService workingGarcons = Executors.newVirtualThreadPerTaskExecutor();
+    private final ExecutorService eatingPhilosophers = Executors.newThreadPerTaskExecutor(Thread.ofPlatform().factory());
 
     public Restaurant(int philosophers, long food, int garcons) throws IllegalArgumentException {
         if (philosophers <= 0) {
@@ -24,10 +30,10 @@ public class Restaurant {
         }
 
         var forks = new Groupex(philosophers);
-        var orderBus = new LinkedBlockingQueue<Tray>(philosophers);
+        var orderBus = new LinkedBlockingQueue<Semaphore>(philosophers);
         var foodPool = new AtomicLong(food);
         this.garcons = Stream
-            .generate(() -> new Garcon(foodPool, orderBus))
+            .generate(() -> new Garcon(foodPool, orderBus, outOfFoodSignal))
             .limit(garcons)
             .toList();
         this.philosophers = IntStream
@@ -37,30 +43,42 @@ public class Restaurant {
     }
 
     public void start() {
-        garcons.forEach(Thread::start);
-        philosophers.forEach(Thread::start);
+        this.garcons.forEach(this.workingGarcons::execute);
+        this.philosophers.forEach(this.eatingPhilosophers::execute);
         this.startDinnerSignal.countDown();
     }
 
     public void join() throws InterruptedException {
-        for (var garcon : garcons) {
-            garcon.join();
-        }
-        for (var philosopher : philosophers) {
-            philosopher.interrupt();
-        }
+        this.outOfFoodSignal.acquire();
+        this.workingGarcons.shutdownNow();
+        this.eatingPhilosophers.shutdownNow();
     }
 
-    public void printStats() {
-        System.out.println("Garcon stats:");
-        for (int i = 0; i < garcons.size(); ++i) {
-            System.out.println(String.format("Garcon %d: served=%d", i, garcons.get(i).getServed()));
-        }
-        System.out.println();
+    public Stats getStats() {
+        var meanServed = this.garcons
+            .stream()
+            .mapToLong(garcon -> garcon.getServed())
+            .average()
+            .orElse(0);
+        var stdServed = Math.sqrt(this.garcons
+            .stream()
+            .mapToDouble(garcon -> Math.pow(garcon.getServed() - meanServed, 2))
+            .average()
+            .orElse(0));
 
-        System.out.println("Philosopher stats:");
-        for (int i = 0; i < philosophers.size(); ++i) {
-            System.out.println(String.format("Philosophers %d: eaten=%d", i, philosophers.get(i).getEaten()));
-        }
+        var meanEaten = this.philosophers
+            .stream()
+            .mapToLong(garcon -> garcon.getEaten())
+            .average()
+            .orElse(0);
+        var stdEaten = Math.sqrt(this.philosophers
+            .stream()
+            .mapToDouble(garcon -> Math.pow(garcon.getEaten() - meanEaten, 2))
+            .average()
+            .orElse(0));
+
+        return new Stats(meanServed, stdServed, meanEaten, stdEaten);
     }
+
+    public static record Stats(double meanServed, double stdServed, double meanEaten, double stdEaten) {}
 }
