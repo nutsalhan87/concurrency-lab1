@@ -32,8 +32,7 @@ public class Garcon extends Thread {
             while (true) {
                 var currentFood = this.food.get();
                 if (currentFood <= 0) {
-                    this.outOfFoodSignal.release();
-                    return;
+                    break;
                 }
                 if (this.food.compareAndSet(currentFood, currentFood - 1)) {
                     this.served++;
@@ -43,6 +42,7 @@ public class Garcon extends Thread {
             }
             foodServedNotifier.release();
         }
+        this.outOfFoodSignal.release();
     }
     
 }
