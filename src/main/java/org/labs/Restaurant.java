@@ -7,9 +7,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 public class Restaurant {
     private final List<Garcon> garcons;
@@ -20,8 +18,8 @@ public class Restaurant {
     private final ExecutorService eatingPhilosophers = Executors.newVirtualThreadPerTaskExecutor();
 
     public Restaurant(int philosophers, long food, int garcons, boolean multipleBuses) throws IllegalArgumentException {
-        if (philosophers <= 0) {
-            throw new IllegalArgumentException("There should be more than 0 philosophers");
+        if (philosophers <= 1) {
+            throw new IllegalArgumentException("There should be more than 1 philosophers");
         }
         if (food <= 0) {
             throw new IllegalArgumentException("Do you know that restaurant needs food?");
@@ -30,10 +28,6 @@ public class Restaurant {
             throw new IllegalArgumentException("There should be more than 0 garcons");
         }
 
-        var forks = Stream
-            .generate(() -> new ReentrantLock())
-            .limit(philosophers)
-            .toList();
         var foodPool = new AtomicLong(food);
 
         int orderBusesCount = multipleBuses ? Math.min(garcons, philosophers) : 1;
@@ -47,8 +41,23 @@ public class Restaurant {
             .toList();
         this.philosophers = IntStream
             .range(0, philosophers)
-            .mapToObj(idx -> new Philosopher(idx, philosophers, forks, orderBuses.get(idx % orderBusesCount), startDinnerSignal))
+            .mapToObj(idx -> new Philosopher(orderBuses.get(idx % orderBusesCount), startDinnerSignal))
             .toList();
+        IntStream
+            .range(0, philosophers)
+            .forEach(idx -> {
+                var p = this.philosophers.get(idx);
+                p.setNeighbours(
+                    this.philosophers.get((idx - 1 + philosophers) % philosophers),
+                    this.philosophers.get((idx + 1) % philosophers)
+                );
+                if (idx % 2 == 0) {
+                    if (idx != philosophers - 1) {
+                        p.giveRightFork();
+                    }
+                    p.giveLeftFork();
+                }
+            });
     }
 
     public void start() {

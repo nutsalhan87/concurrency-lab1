@@ -7,18 +7,18 @@ import org.junit.jupiter.api.Test;
 
 class RestaurantTest {
     @Test
-    void rejectsMissingPhilosophers() {
-        assertThrows(IllegalArgumentException.class, () -> new Restaurant(0, 1, 1, false));
+    void rejectsOnePhilosopher() {
+        assertThrows(IllegalArgumentException.class, () -> new Restaurant(1, 1, 1, false));
     }
 
     @Test
     void rejectsMissingFood() {
-        assertThrows(IllegalArgumentException.class, () -> new Restaurant(1, 0, 1, false));
+        assertThrows(IllegalArgumentException.class, () -> new Restaurant(2, 0, 1, false));
     }
 
     @Test
     void rejectsMissingGarcons() {
-        assertThrows(IllegalArgumentException.class, () -> new Restaurant(1, 1, 0, false));
+        assertThrows(IllegalArgumentException.class, () -> new Restaurant(2, 1, 0, false));
     }
 
     @Test
