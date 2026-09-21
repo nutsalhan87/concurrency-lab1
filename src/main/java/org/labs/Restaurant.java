@@ -8,7 +8,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 public class Restaurant {
     private final List<Garcon> garcons;
@@ -18,7 +17,7 @@ public class Restaurant {
     private final ExecutorService workingGarcons = Executors.newVirtualThreadPerTaskExecutor();
     private final ExecutorService eatingPhilosophers = Executors.newThreadPerTaskExecutor(Thread.ofPlatform().factory());
 
-    public Restaurant(int philosophers, long food, int garcons) throws IllegalArgumentException {
+    public Restaurant(int philosophers, long food, int garcons, boolean multipleBuses) throws IllegalArgumentException {
         if (philosophers <= 0) {
             throw new IllegalArgumentException("There should be more than 0 philosophers");
         }
@@ -30,15 +29,20 @@ public class Restaurant {
         }
 
         var forks = new Groupex(philosophers);
-        var orderBus = new LinkedBlockingQueue<Semaphore>(philosophers);
         var foodPool = new AtomicLong(food);
-        this.garcons = Stream
-            .generate(() -> new Garcon(foodPool, orderBus, outOfFoodSignal))
-            .limit(garcons)
+
+        int orderBusesCount = multipleBuses ? Math.min(garcons, philosophers) : 1;
+        var orderBuses = IntStream
+            .range(0, orderBusesCount)
+            .mapToObj(_ -> new LinkedBlockingQueue<Semaphore>(philosophers / orderBusesCount + 1))
+            .toList();
+        this.garcons = IntStream
+            .range(0, garcons)
+            .mapToObj(idx -> new Garcon(foodPool, orderBuses.get(idx % orderBusesCount), outOfFoodSignal))
             .toList();
         this.philosophers = IntStream
             .range(0, philosophers)
-            .mapToObj(idx -> new Philosopher(idx, philosophers, forks, orderBus, startDinnerSignal))
+            .mapToObj(idx -> new Philosopher(idx, philosophers, forks, orderBuses.get(idx % orderBusesCount), startDinnerSignal))
             .toList();
     }
 
