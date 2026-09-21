@@ -8,22 +8,22 @@ import org.junit.jupiter.api.Test;
 class RestaurantTest {
     @Test
     void rejectsMissingPhilosophers() {
-        assertThrows(IllegalArgumentException.class, () -> new Restaurant(0, 1, 1));
+        assertThrows(IllegalArgumentException.class, () -> new Restaurant(0, 1, 1, false));
     }
 
     @Test
     void rejectsMissingFood() {
-        assertThrows(IllegalArgumentException.class, () -> new Restaurant(1, 0, 1));
+        assertThrows(IllegalArgumentException.class, () -> new Restaurant(1, 0, 1, false));
     }
 
     @Test
     void rejectsMissingGarcons() {
-        assertThrows(IllegalArgumentException.class, () -> new Restaurant(1, 1, 0));
+        assertThrows(IllegalArgumentException.class, () -> new Restaurant(1, 1, 0, false));
     }
 
     @Test
     void reportsEmptyStatsBeforeStart() {
-        var stats = new Restaurant(2, 1, 1).getStats();
+        var stats = new Restaurant(2, 1, 1, false).getStats();
 
         assertEquals(0.0, stats.meanServed());
         assertEquals(0.0, stats.stdServed());
