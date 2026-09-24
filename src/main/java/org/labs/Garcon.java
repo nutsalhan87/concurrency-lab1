@@ -29,18 +29,10 @@ public class Garcon extends Thread {
             } catch (InterruptedException e) {
                 return;
             }
-            while (true) {
-                var currentFood = this.food.get();
-                if (currentFood <= 0) {
-                    break;
-                }
-                if (this.food.compareAndSet(currentFood, currentFood - 1)) {
-                    this.served++;
-                    break;
-                }
-                Thread.onSpinWait();
+            var oldValue = this.food.getAndDecrement();
+            if (oldValue > 0) {
+                foodServedNotifier.release();
             }
-            foodServedNotifier.release();
         }
         this.outOfFoodSignal.release();
     }
