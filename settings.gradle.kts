@@ -1,2 +1,1 @@
-rootProject.name = "parallel-lab11"
-
+rootProject.name = "concurrency-lab1"
