@@ -31,6 +31,7 @@ public class Garcon extends Thread {
             }
             var oldValue = this.food.getAndDecrement();
             if (oldValue > 0) {
+		this.served++;
                 foodServedNotifier.release();
             }
         }
