@@ -1,7 +1,6 @@
 package org.labs;
 
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -12,7 +11,6 @@ import java.util.stream.IntStream;
 public class Restaurant {
     private final List<Garcon> garcons;
     private final List<Philosopher> philosophers;
-    private final CountDownLatch startDinnerSignal = new CountDownLatch(1);
     private final Semaphore outOfFoodSignal = new Semaphore(0);
     private final ExecutorService workingGarcons = Executors.newVirtualThreadPerTaskExecutor();
     private final ExecutorService eatingPhilosophers = Executors.newVirtualThreadPerTaskExecutor();
@@ -41,7 +39,7 @@ public class Restaurant {
             .toList();
         this.philosophers = IntStream
             .range(0, philosophers)
-            .mapToObj(idx -> new Philosopher(orderBuses.get(idx % orderBusesCount), startDinnerSignal))
+            .mapToObj(idx -> new Philosopher(orderBuses.get(idx % orderBusesCount)))
             .toList();
         IntStream
             .range(0, philosophers)
@@ -63,7 +61,6 @@ public class Restaurant {
     public void start() {
         this.garcons.forEach(this.workingGarcons::execute);
         this.philosophers.forEach(this.eatingPhilosophers::execute);
-        this.startDinnerSignal.countDown();
     }
 
     public void join() throws InterruptedException {

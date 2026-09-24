@@ -2,22 +2,19 @@ package org.labs;
 
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 
 public class Philosopher extends Thread {
     private final Semaphore foodServedNotifier = new Semaphore(0, false);
     private final BlockingQueue<Semaphore> orderBus;
-    private final CountDownLatch startDinnerSignal;
     private final Semaphore leftFork = new Semaphore(0);
     private final Semaphore rightFork = new Semaphore(0);
     private Optional<Philosopher> leftPhilosopher = Optional.empty();
     private Optional<Philosopher> rightPhilosopher = Optional.empty();
     private long eaten = 0;
     
-    public Philosopher(BlockingQueue<Semaphore> orderBus, CountDownLatch startDinnerSignal) {
+    public Philosopher(BlockingQueue<Semaphore> orderBus) {
         this.orderBus = orderBus;
-        this.startDinnerSignal = startDinnerSignal;
     }
 
     public void setNeighbours(Philosopher leftPhilosopher, Philosopher rightPhilosopher) {
@@ -40,7 +37,6 @@ public class Philosopher extends Thread {
     @Override
     public void run() {
         try {
-            startDinnerSignal.await();
             while (true) {
                 orderBus.put(foodServedNotifier);
                 foodServedNotifier.acquire();
